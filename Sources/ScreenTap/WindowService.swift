@@ -1,6 +1,8 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 peses0326
 import AppKit
 import ApplicationServices
-import LeanTabCore
+import ScreenTapCore
 import Darwin
 
 struct WindowRecord {

@@ -1,0 +1,19 @@
+name: Package release
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./scripts/test.sh
+      - run: ./scripts/package.sh --dmg
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          version=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' Resources/Info.plist)
+          gh release create "v$version" dist/ScreenTap-macOS-arm64.zip "dist/ScreenTap-$version-arm64.dmg" dist/SHA256SUMS --target "$GITHUB_SHA" --title "ScreenTap $version" --notes-file "docs/release-$version.md"

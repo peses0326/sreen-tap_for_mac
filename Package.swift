@@ -2,15 +2,16 @@
 import PackageDescription
 
 let package = Package(
-    name: "LeanTab",
+    name: "ScreenTap",
     platforms: [.macOS(.v14)],
-    products: [.executable(name: "LeanTab", targets: ["LeanTab"])],
+    products: [.executable(name: "ScreenTap", targets: ["ScreenTap"])],
     targets: [
-        .target(name: "LeanTabCore"),
-        .executableTarget(name: "LeanTab", dependencies: ["LeanTabCore"], linkerSettings: [
+        .target(name: "ScreenTapCore"),
+        .executableTarget(name: "ScreenTap", dependencies: ["ScreenTapCore"], linkerSettings: [
             .linkedFramework("AppKit"), .linkedFramework("ApplicationServices"),
             .linkedFramework("ScreenCaptureKit"), .linkedFramework("Carbon")
         ]),
-        .executableTarget(name: "CoreChecks", dependencies: ["LeanTabCore"], path: "Tests/LeanTabCoreTests")
+        .executableTarget(name: "BrandAssets", dependencies: ["ScreenTapCore"], path: "Tools/BrandAssets"),
+        .executableTarget(name: "CoreChecks", dependencies: ["ScreenTapCore"], path: "Tests/ScreenTapCoreTests")
     ]
 )

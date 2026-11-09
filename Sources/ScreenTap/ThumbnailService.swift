@@ -1,6 +1,8 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 peses0326
 import AppKit
 import ScreenCaptureKit
-import LeanTabCore
+import ScreenTapCore
 
 final class ThumbnailService {
     let cache = ByteCache<WindowKey, CGImage>(limit: 12 * 1024 * 1024)

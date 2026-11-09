@@ -1,17 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-<key>CFBundleExecutable</key><string>LeanTab</string>
+<key>CFBundleExecutable</key><string>ScreenTap</string>
 <key>CFBundleIdentifier</key><string>local.espark.LeanTab</string>
-<key>CFBundleName</key><string>LeanTab</string>
-<key>CFBundleDisplayName</key><string>LeanTab</string>
+<key>CFBundleName</key><string>ScreenTap</string>
+<key>CFBundleDisplayName</key><string>ScreenTap</string>
+<key>CFBundleIconFile</key><string>AppIcon</string>
+<key>NSHumanReadableCopyright</key><string>Copyright © 2026 peses0326. MIT License.</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.1.1</string>
-<key>CFBundleVersion</key><string>2</string>
+<key>CFBundleShortVersionString</key><string>0.2.0</string>
+<key>CFBundleVersion</key><string>3</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>LSUIElement</key><true/>
 <key>NSHighResolutionCapable</key><true/>
 <key>CFBundleDevelopmentRegion</key><string>en</string>
 <key>CFBundleLocalizations</key><array><string>en</string><string>ko</string></array>
-<key>NSScreenCaptureUsageDescription</key><string>LeanTab captures small window thumbnails only while the window switcher is open.</string>
+<key>NSScreenCaptureUsageDescription</key><string>ScreenTap captures small window thumbnails only while the window switcher is open.</string>
 </dict></plist>

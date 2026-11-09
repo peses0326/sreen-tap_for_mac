@@ -1,6 +1,8 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 peses0326
 import AppKit
 import ApplicationServices
-import LeanTabCore
+import ScreenTapCore
 import Darwin
 
 final class AppController: NSObject, NSApplicationDelegate {
@@ -34,7 +36,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         }
         NSApp.setActivationPolicy(.accessory)
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        item.button?.image = NSImage(systemSymbolName: "rectangle.on.rectangle", accessibilityDescription: "LeanTab")
+        item.button?.image = menuIcon()
         rebuildMenu()
         hotkey.handle = { [weak self] type, event in self?.handle(type, event) ?? false }
         hotkey.disabled = { [weak self] in self?.dismiss() }
@@ -60,6 +62,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         add(L.text("창 전환기 열기", "Open window switcher"), #selector(openFromMenu))
         add(L.text("권한 설정 / 다시 연결", "Permissions / Reconnect"), #selector(reconnect))
         add(L.text("메모리 진단 복사", "Copy memory diagnostics"), #selector(copyDiagnostics))
+        add(L.text("ScreenTap 정보", "About ScreenTap"), #selector(showAbout))
         menu.addItem(.separator())
         let language = NSMenuItem(title: L.text("언어", "Language"), action: nil, keyEquivalent: "")
         let languages = NSMenu()
@@ -70,7 +73,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         }
         language.submenu = languages; menu.addItem(language)
         menu.addItem(.separator())
-        add(L.text("LeanTab 종료", "Quit LeanTab"), #selector(quit))
+        add(L.text("ScreenTap 종료", "Quit ScreenTap"), #selector(quit))
         item.menu = menu
     }
 
@@ -78,6 +81,27 @@ final class AppController: NSObject, NSApplicationDelegate {
         UserDefaults.standard.set(sender.representedObject as? String, forKey: "language")
         dismiss(); rebuildMenu()
         if permissionWindow != nil { permissionWindow?.close(); permissionWindow = nil; showPermissions() }
+    }
+    private func menuIcon() -> NSImage {
+        let image = NSImage(size: NSSize(width: 20, height: 18))
+        image.lockFocus()
+        NSColor.black.setStroke()
+        let back = NSBezierPath(roundedRect: NSRect(x: 1, y: 6, width: 13, height: 10), xRadius: 2, yRadius: 2)
+        back.lineWidth = 1.2; back.stroke()
+        let front = NSBezierPath(roundedRect: NSRect(x: 5, y: 2, width: 14, height: 11), xRadius: 2, yRadius: 2)
+        NSColor.white.setFill(); front.fill(); front.lineWidth = 1.2; front.stroke()
+        let arrow = NSBezierPath(); arrow.lineWidth = 1.4; arrow.lineCapStyle = .round; arrow.lineJoinStyle = .round
+        arrow.move(to: NSPoint(x: 8, y: 7.5)); arrow.line(to: NSPoint(x: 15.5, y: 7.5))
+        arrow.move(to: NSPoint(x: 12.5, y: 10)); arrow.line(to: NSPoint(x: 15.5, y: 7.5)); arrow.line(to: NSPoint(x: 12.5, y: 5))
+        arrow.stroke(); image.unlockFocus(); image.isTemplate = true
+        image.accessibilityDescription = "ScreenTap"
+        return image
+    }
+    @objc private func showAbout() {
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.orderFrontStandardAboutPanel(options: [
+            .applicationName: "ScreenTap", .applicationVersion: "0.2.0",
+            .credits: NSAttributedString(string: L.text("창을 보고, 선택하고, 하던 일을 이어가세요.\nAltTab에서 영감을 받아 별도로 작성했습니다.", "See your windows. Keep your flow.\nInspired by AltTab; independently written."))])
     }
     @objc private func quit() { NSApp.terminate(nil) }
     @objc private func reconnect() {
@@ -233,13 +257,13 @@ final class AppController: NSObject, NSApplicationDelegate {
         if let permissionWindow { permissionWindow.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true); return }
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 590, height: 380),
                               styleMask: [.titled, .closable], backing: .buffered, defer: false)
-        window.title = "LeanTab"; window.isReleasedWhenClosed = false; window.center()
+        window.title = "ScreenTap"; window.isReleasedWhenClosed = false; window.center()
         let root = NSView(frame: NSRect(x: 0, y: 0, width: 590, height: 380))
         let title = NSTextField(labelWithString: L.text("가벼운 창 전환, 필요한 권한 두 가지", "Lightweight window switching"))
         title.font = .boldSystemFont(ofSize: 22); title.frame = NSRect(x: 28, y: 318, width: 540, height: 32); root.addSubview(title)
         let description = NSTextField(wrappingLabelWithString: L.text(
-            "접근성: ⌥Tab 단축키와 개별 창 전환\n화면 및 시스템 오디오 기록: 창 미리보기 이미지\n\n기존 AltTab의 단축키를 끄거나 앱을 종료한 뒤 사용하세요.\n권한 변경 후 LeanTab을 다시 시작해야 할 수 있습니다.\n⌥Tab으로 열고, ⌥를 누른 채 Tab으로 이동한 뒤 놓으면 전환합니다.",
-            "Accessibility: ⌥Tab shortcut and individual window switching\nScreen & System Audio Recording: window thumbnails\n\nQuit AltTab or disable its shortcut before using LeanTab.\nYou may need to restart LeanTab after changing permissions.\nHold ⌥, press Tab to select, then release ⌥ to switch."))
+            "접근성: ⌥Tab 단축키와 개별 창 전환\n화면 및 시스템 오디오 기록: 창 미리보기 이미지\n\n기존 AltTab의 단축키를 끄거나 앱을 종료한 뒤 사용하세요.\n권한 변경 후 ScreenTap을 다시 시작해야 할 수 있습니다.\n⌥Tab으로 열고, ⌥를 누른 채 Tab으로 이동한 뒤 놓으면 전환합니다.",
+            "Accessibility: ⌥Tab shortcut and individual window switching\nScreen & System Audio Recording: window thumbnails\n\nQuit AltTab or disable its shortcut before using ScreenTap.\nYou may need to restart ScreenTap after changing permissions.\nHold ⌥, press Tab to select, then release ⌥ to switch."))
         description.frame = NSRect(x: 28, y: 142, width: 530, height: 166); root.addSubview(description)
         let state = NSTextField(labelWithString: "\(L.text("접근성", "Accessibility")): \(AXIsProcessTrusted() ? "✓" : "—")    \(L.text("화면 기록", "Screen Recording")): \(CGPreflightScreenCaptureAccess() ? "✓" : "—")")
         state.frame = NSRect(x: 28, y: 110, width: 530, height: 24); root.addSubview(state)
@@ -272,7 +296,7 @@ final class AppController: NSObject, NSApplicationDelegate {
 
     private func memoryReport() -> String {
         let footprint = MemoryDiagnostics.footprint()
-        return "LeanTab 0.1.1\nmacOS: \(ProcessInfo.processInfo.operatingSystemVersionString)\nPhysical footprint: \(footprint)\nThumbnail bytes: \(thumbnails.cache.bytes) / \(thumbnails.cache.limit)\nThumbnail count: \(thumbnails.cache.count)\nVisible windows: \(records.count)\nAccessibility: \(AXIsProcessTrusted())\nScreen recording: \(CGPreflightScreenCaptureAccess())\nSwitcher open: \(visible)\n\(thumbnails.diagnosticReport)"
+        return "ScreenTap 0.2.0\nmacOS: \(ProcessInfo.processInfo.operatingSystemVersionString)\nPhysical footprint: \(footprint)\nThumbnail bytes: \(thumbnails.cache.bytes) / \(thumbnails.cache.limit)\nThumbnail count: \(thumbnails.cache.count)\nVisible windows: \(records.count)\nAccessibility: \(AXIsProcessTrusted())\nScreen recording: \(CGPreflightScreenCaptureAccess())\nSwitcher open: \(visible)\n\(thumbnails.diagnosticReport)"
     }
     @objc private func copyDiagnostics() {
         NSPasteboard.general.clearContents()
@@ -281,7 +305,7 @@ final class AppController: NSObject, NSApplicationDelegate {
 
     private func showPreview() {
         createPanel(); visible = true
-        let titles = ["LeanTab · Memory budget", "~/projects — zsh", "# engineering", "Weekly calendar"]
+        let titles = ["ScreenTap · Memory budget", "~/projects — zsh", "# engineering", "Weekly calendar"]
         let apps = ["Chrome", "Terminal", "Slack", "Calendar"]
         records = (0..<17).map { index -> WindowRecord in
             let key = WindowKey(pid: getpid(), id: UInt32(index + 1))

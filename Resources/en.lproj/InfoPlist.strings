@@ -1,1 +1,1 @@
-NSScreenCaptureUsageDescription = "LeanTab captures small window thumbnails only while the window switcher is open.";
+NSScreenCaptureUsageDescription = "ScreenTap captures small window thumbnails only while the window switcher is open.";

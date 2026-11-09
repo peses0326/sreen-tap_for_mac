@@ -1,7 +1,9 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 peses0326
 import AppKit
 
 if CommandLine.arguments.contains("--diagnostics") {
-    print("LeanTab headless process footprint: \(MemoryDiagnostics.footprint())")
+    print("ScreenTap headless process footprint: \(MemoryDiagnostics.footprint())")
     print("Excludes GUI and capture. Use menu diagnostics to measure real usage.")
 } else {
     let app = NSApplication.shared

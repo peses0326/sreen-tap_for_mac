@@ -1,6 +1,7 @@
 import Foundation
 import CoreGraphics
-import LeanTabCore
+import ImageIO
+import ScreenTapCore
 
 final class WindowOrderTests {
     func testIndividualWindowsOfSameAppHaveIndependentRecency() {
@@ -139,6 +140,34 @@ final class PreviewRegressionTests {
     }
 }
 
+final class BrandingTests {
+    func testProductionRendererDrawsThumbnailContent() {
+        guard let thumbnail = CGContext(data: nil, width: 100, height: 50, bitsPerComponent: 8, bytesPerRow: 400,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+            let canvas = CGContext(data: nil, width: 540, height: 288, bitsPerComponent: 8, bytesPerRow: 2160,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { checkTrue(false); return }
+        thumbnail.setFillColor(CGColor(srgbRed: 1, green: 0, blue: 0, alpha: 1))
+        thumbnail.fill(CGRect(x: 0, y: 0, width: 100, height: 50))
+        SwitcherRenderer.draw(in: canvas, size: CGSize(width: 540, height: 288),
+            cards: [SwitcherCard(app: "Demo", title: "Window", image: thumbnail.makeImage(), icon: nil)],
+            selected: 0, offset: 0, total: 1, columns: 2, status: "", hint: "Option-Tab")
+        guard let data = canvas.makeImage()?.dataProvider?.data, let bytes = CFDataGetBytePtr(data) else { checkTrue(false); return }
+        var redPixels = 0, greenPixels = 0
+        for pixel in 0..<(540 * 288) {
+            let i = pixel * 4
+            if bytes[i] > 240 && bytes[i+1] < 15 && bytes[i+2] < 15 { redPixels += 1 }
+            if bytes[i+1] > 210 && bytes[i] < 180 && bytes[i+2] > 140 { greenPixels += 1 }
+        }
+        checkTrue(redPixels > 10000); checkTrue(greenPixels > 100)
+    }
+    func testMacOSRecognizesAppIcon() {
+        let url = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("Resources/AppIcon.icns")
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { checkTrue(false); return }
+        checkTrue(CGImageSourceGetCount(source) > 0)
+        checkNotNil(CGImageSourceCreateImageAtIndex(source, 0, nil))
+    }
+}
+
 // Standalone checks run with Command Line Tools; XCTest requires a full Xcode install.
 var failures = 0
 func checkTrue(_ condition: Bool, file: StaticString = #filePath, line: UInt = #line) {
@@ -153,8 +182,10 @@ func checkNotNil<T>(_ a: T?, file: StaticString = #filePath, line: UInt = #line)
 
 @main enum CoreChecks {
     static func main() {
-        let order = WindowOrderTests(), memory = MemoryBudgetTests(), capture = CaptureGateTests(), preview = PreviewRegressionTests()
+        let order = WindowOrderTests(), memory = MemoryBudgetTests(), capture = CaptureGateTests(), preview = PreviewRegressionTests(), branding = BrandingTests()
         let tests: [(String, () -> Void)] = [
+            ("production renderer displays captured thumbnail pixels", branding.testProductionRendererDrawsThumbnailContent),
+            ("macOS decodes application icon", branding.testMacOSRecognizesAppIcon),
             ("oversized screenshot produces visible bounded pixels", preview.testOversizedCaptureIsDownsampledInsteadOfDiscarded),
             ("portrait screenshot normalization", preview.testPortraitCaptureStaysInsideBudget),
             ("blank margins / gutters / empty cells cancel", preview.testBlankMarginsGuttersAndUnusedCellsCancel),
