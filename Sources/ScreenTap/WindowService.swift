@@ -57,6 +57,7 @@ final class WindowService {
             tokens.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] notification in
                 guard let self, let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
                 self.queue.async {
+                    guard self.isTracking else { return }
                     if name == NSWorkspace.didTerminateApplicationNotification {
                         if let observer = self.observers.removeValue(forKey: app.processIdentifier) {
                             CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .commonModes)
@@ -67,6 +68,15 @@ final class WindowService {
                     }
                 }
             })
+        }
+    }
+
+    func stop() {
+        queue.async { [self] in
+            for observer in observers.values {
+                CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .commonModes)
+            }
+            observers.removeAll(); isTracking = false
         }
     }
 

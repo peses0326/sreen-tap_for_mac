@@ -23,7 +23,10 @@ final class AppController: NSObject, NSApplicationDelegate {
     private var page = -1
     private var pageSize = 12
     private var columns = 4
-    private var permissionWindow: NSWindow?
+    private var permissions: PermissionsController?
+    private var lastAccessibility: Bool?
+    private var lastScreenRecording: Bool?
+    private var appVersion: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev" }
     private var consumedKeys: Set<Int64> = []
     private var consumedMouseUps: Set<CGEventType> = []
     private var workspaceTokens: [NSObjectProtocol] = []
@@ -48,9 +51,21 @@ final class AppController: NSObject, NSApplicationDelegate {
         for name in [NSWorkspace.willSleepNotification, NSWorkspace.sessionDidResignActiveNotification] {
             workspaceTokens.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in self?.dismiss() })
         }
-        if AXIsProcessTrusted() { windows.start() }
-        let ready = hotkey.start()
-        if !ready || !AXIsProcessTrusted() || !CGPreflightScreenCaptureAccess() { showPermissions() }
+        workspaceTokens.append(center.addObserver(forName: NSWorkspace.didDeactivateApplicationNotification, object: nil, queue: .main) { [weak self] notification in
+            guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+                  app.bundleIdentifier == "com.apple.systempreferences" else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                guard let self else { return }
+                if let permissions = self.permissions, permissions.window?.isVisible == true { permissions.refresh() }
+                else { _ = self.refreshPermissions() }
+            }
+        })
+        workspaceTokens.append(NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            guard let self else { return }
+            if let permissions = self.permissions, permissions.window?.isVisible == true { permissions.refresh() }
+            else { _ = self.refreshPermissions() }
+        })
+        if !refreshPermissions().isReady { showPermissions() }
         if CommandLine.arguments.contains("--preview") { showPreview() }
     }
 
@@ -80,7 +95,7 @@ final class AppController: NSObject, NSApplicationDelegate {
     @objc private func setLanguage(_ sender: NSMenuItem) {
         UserDefaults.standard.set(sender.representedObject as? String, forKey: "language")
         dismiss(); rebuildMenu()
-        if permissionWindow != nil { permissionWindow?.close(); permissionWindow = nil; showPermissions() }
+        if permissions?.window?.isVisible == true { permissions?.close(); permissions = nil; showPermissions() }
     }
     private func menuIcon() -> NSImage {
         let image = NSImage(size: NSSize(width: 20, height: 18))
@@ -100,13 +115,12 @@ final class AppController: NSObject, NSApplicationDelegate {
     @objc private func showAbout() {
         NSApp.activate(ignoringOtherApps: true)
         NSApp.orderFrontStandardAboutPanel(options: [
-            .applicationName: "ScreenTap", .applicationVersion: "0.2.0",
+            .applicationName: "ScreenTap", .applicationVersion: appVersion,
             .credits: NSAttributedString(string: L.text("창을 보고, 선택하고, 하던 일을 이어가세요.\nAltTab에서 영감을 받아 별도로 작성했습니다.", "See your windows. Keep your flow.\nInspired by AltTab; independently written."))])
     }
     @objc private func quit() { NSApp.terminate(nil) }
     @objc private func reconnect() {
-        if AXIsProcessTrusted() { windows.start() }
-        _ = hotkey.start()
+        hotkey.stop(); windows.stop(); lastAccessibility = nil
         showPermissions()
     }
     @objc private func openFromMenu() {
@@ -253,50 +267,54 @@ final class AppController: NSObject, NSApplicationDelegate {
         thumbnails.clear()
     }
 
-    @objc private func showPermissions() {
-        if let permissionWindow { permissionWindow.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true); return }
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 590, height: 380),
-                              styleMask: [.titled, .closable], backing: .buffered, defer: false)
-        window.title = "ScreenTap"; window.isReleasedWhenClosed = false; window.center()
-        let root = NSView(frame: NSRect(x: 0, y: 0, width: 590, height: 380))
-        let title = NSTextField(labelWithString: L.text("가벼운 창 전환, 필요한 권한 두 가지", "Lightweight window switching"))
-        title.font = .boldSystemFont(ofSize: 22); title.frame = NSRect(x: 28, y: 318, width: 540, height: 32); root.addSubview(title)
-        let description = NSTextField(wrappingLabelWithString: L.text(
-            "접근성: ⌥Tab 단축키와 개별 창 전환\n화면 및 시스템 오디오 기록: 창 미리보기 이미지\n\n기존 AltTab의 단축키를 끄거나 앱을 종료한 뒤 사용하세요.\n권한 변경 후 ScreenTap을 다시 시작해야 할 수 있습니다.\n⌥Tab으로 열고, ⌥를 누른 채 Tab으로 이동한 뒤 놓으면 전환합니다.",
-            "Accessibility: ⌥Tab shortcut and individual window switching\nScreen & System Audio Recording: window thumbnails\n\nQuit AltTab or disable its shortcut before using ScreenTap.\nYou may need to restart ScreenTap after changing permissions.\nHold ⌥, press Tab to select, then release ⌥ to switch."))
-        description.frame = NSRect(x: 28, y: 142, width: 530, height: 166); root.addSubview(description)
-        let state = NSTextField(labelWithString: "\(L.text("접근성", "Accessibility")): \(AXIsProcessTrusted() ? "✓" : "—")    \(L.text("화면 기록", "Screen Recording")): \(CGPreflightScreenCaptureAccess() ? "✓" : "—")")
-        state.frame = NSRect(x: 28, y: 110, width: 530, height: 24); root.addSubview(state)
-        for (title, action, x) in [
-            (L.text("접근성 설정", "Accessibility"), #selector(openAccessibility), CGFloat(28)),
-            (L.text("화면 기록 설정", "Screen Recording"), #selector(openScreenRecording), CGFloat(202)),
-            (L.text("다시 연결", "Reconnect"), #selector(checkPermissions), CGFloat(400))] {
-            let button = NSButton(title: title, target: self, action: action)
-            button.bezelStyle = .rounded; button.frame = NSRect(x: x, y: 42, width: 160, height: 34); root.addSubview(button)
+    private func refreshPermissions() -> PermissionStatus {
+        let accessibility = AXIsProcessTrusted()
+        let recording = CGPreflightScreenCaptureAccess()
+        if accessibility {
+            if lastAccessibility != true { windows.start() }
+        } else {
+            hotkey.stop()
+            if lastAccessibility == true { windows.stop(); dismiss() }
         }
-        window.contentView = root; permissionWindow = window
-        window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
+        let shortcut = accessibility && hotkey.start()
+        if lastScreenRecording == true && !recording { thumbnails.clear(); view?.needsDisplay = true }
+        if lastScreenRecording == false && recording && visible && !loading { page = -1; render() }
+        lastAccessibility = accessibility; lastScreenRecording = recording
+        return PermissionStatus(accessibility: accessibility, screenRecording: recording, shortcut: shortcut)
     }
 
-    @objc private func openAccessibility() {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-        _ = AXIsProcessTrustedWithOptions(options)
-        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+    @objc private func showPermissions() {
+        if permissions == nil {
+            let controller = PermissionsController()
+            controller.readStatus = { [weak self] in
+                self?.refreshPermissions() ?? PermissionStatus(accessibility: false, screenRecording: false, shortcut: false)
+            }
+            controller.restart = { [weak self] in self?.restartForPermissions() }
+            permissions = controller
+        }
+        permissions?.present()
     }
-    @objc private func openScreenRecording() {
-        _ = CGRequestScreenCaptureAccess()
-        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!)
-    }
-    @objc private func checkPermissions() {
-        permissionWindow?.close(); permissionWindow = nil
-        if AXIsProcessTrusted() { windows.start() }
-        _ = hotkey.start()
-        if !AXIsProcessTrusted() || !CGPreflightScreenCaptureAccess() { showPermissions() }
+
+    private func restartForPermissions() {
+        dismiss()
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.createsNewApplicationInstance = true
+        NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: configuration) { app, error in
+            DispatchQueue.main.async {
+                guard let app, app.processIdentifier != getpid(), error == nil else {
+                    let alert = NSAlert()
+                    alert.messageText = L.text("앱을 다시 시작하지 못했습니다", "Could not restart the app")
+                    alert.informativeText = L.text("메뉴에서 ScreenTap을 종료한 뒤 다시 열어 주세요.", "Quit ScreenTap from its menu, then open it again.")
+                    alert.runModal(); return
+                }
+                NSApp.terminate(nil)
+            }
+        }
     }
 
     private func memoryReport() -> String {
         let footprint = MemoryDiagnostics.footprint()
-        return "ScreenTap 0.2.0\nmacOS: \(ProcessInfo.processInfo.operatingSystemVersionString)\nPhysical footprint: \(footprint)\nThumbnail bytes: \(thumbnails.cache.bytes) / \(thumbnails.cache.limit)\nThumbnail count: \(thumbnails.cache.count)\nVisible windows: \(records.count)\nAccessibility: \(AXIsProcessTrusted())\nScreen recording: \(CGPreflightScreenCaptureAccess())\nSwitcher open: \(visible)\n\(thumbnails.diagnosticReport)"
+        return "ScreenTap \(appVersion)\nmacOS: \(ProcessInfo.processInfo.operatingSystemVersionString)\nPhysical footprint: \(footprint)\nThumbnail bytes: \(thumbnails.cache.bytes) / \(thumbnails.cache.limit)\nThumbnail count: \(thumbnails.cache.count)\nVisible windows: \(records.count)\nAccessibility: \(AXIsProcessTrusted())\nScreen recording: \(CGPreflightScreenCaptureAccess())\nSwitcher open: \(visible)\n\(thumbnails.diagnosticReport)"
     }
     @objc private func copyDiagnostics() {
         NSPasteboard.general.clearContents()

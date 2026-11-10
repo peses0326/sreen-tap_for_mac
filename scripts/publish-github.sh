@@ -1,7 +1,7 @@
 #!/bin/zsh
 set -euo pipefail
 cd "${0:A:h}/.."
-repo=peses0326/screentap
+repo=peses0326/sreen-tap_for_mac
 version=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' Resources/Info.plist)
 if [[ -n "$(git status --porcelain)" ]]; then
   echo "Commit the source changes before publishing." >&2; exit 1
