@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 peses0326
 import AppKit
+import ApplicationServices
+import ScreenCaptureKit
+import ScreenTapCore
 
 struct PermissionStatus: Equatable {
     let accessibility: Bool
@@ -9,14 +12,19 @@ struct PermissionStatus: Equatable {
     var isReady: Bool { accessibility && screenRecording && shortcut }
 }
 
-enum PermissionKind { case accessibility, screenRecording }
-
 final class PermissionsController: NSWindowController, NSWindowDelegate {
     var readStatus: (() -> PermissionStatus)?
     var restart: (() -> Void)?
     private var monitor: Timer?
     private var presentingConsent = false
     private var lastShownStatus: PermissionStatus?
+    private var screenRequestOutcome = "not requested"
+    var diagnosticReport: String {
+        "Accessibility OS request sent: \(requests.hasRequested(.accessibility))\nScreen Recording OS request sent: \(requests.hasRequested(.screenRecording))\nScreen Recording request result: \(screenRequestOutcome)\n"
+    }
+    private lazy var requests = PermissionRequests(
+        requestSystem: { [weak self] in self?.requestSystemPermission($0) },
+        openSettings: { [weak self] in self?.openSystemSettings($0) })
     private let accessibilityState = NSTextField(labelWithString: "")
     private let recordingState = NSTextField(labelWithString: "")
     private let accessibilityButton = NSButton()
@@ -39,8 +47,8 @@ final class PermissionsController: NSWindowController, NSWindowDelegate {
         showWindow(nil); NSApp.activate(ignoringOtherApps: true)
         startMonitoring()
     }
-    func refresh() {
-        guard let status = readStatus?(), status != lastShownStatus else { return }
+    func refresh(force: Bool = false) {
+        guard let status = readStatus?(), force || status != lastShownStatus else { return }
         lastShownStatus = status
         accessibilityState.stringValue = status.accessibility
             ? (status.shortcut ? L.text("허용됨 · 단축키 연결 완료", "Allowed · shortcut connected") : L.text("허용됨 · 단축키 연결 대기", "Allowed · reconnecting shortcut"))
@@ -50,8 +58,10 @@ final class PermissionsController: NSWindowController, NSWindowDelegate {
         recordingState.textColor = status.screenRecording ? .systemGreen : .secondaryLabelColor
         accessibilityButton.isEnabled = !status.accessibility
         recordingButton.isEnabled = !status.screenRecording
-        accessibilityButton.title = status.accessibility ? L.text("허용됨", "Allowed") : L.text("허용", "Allow")
-        recordingButton.title = status.screenRecording ? L.text("허용됨", "Allowed") : L.text("허용", "Allow")
+        accessibilityButton.title = status.accessibility ? L.text("허용됨", "Allowed")
+            : (requests.hasRequested(.accessibility) ? L.text("설정 열기", "Open Settings") : L.text("허용", "Allow"))
+        recordingButton.title = status.screenRecording ? L.text("허용됨", "Allowed")
+            : (requests.hasRequested(.screenRecording) ? L.text("설정 열기", "Open Settings") : L.text("허용", "Allow"))
         restartButton.isHidden = status.isReady
         closeButton.title = status.isReady ? L.text("완료", "Done") : L.text("나중에", "Not now")
         message.stringValue = status.isReady
@@ -79,7 +89,7 @@ final class PermissionsController: NSWindowController, NSWindowDelegate {
         let title = NSTextField(labelWithString: L.text("창 전환을 위한 권한 설정", "Permissions for window switching"))
         title.font = .boldSystemFont(ofSize: 23)
         title.frame = NSRect(x: 28, y: 366, width: 565, height: 34); root.addSubview(title)
-        let intro = NSTextField(wrappingLabelWithString: L.text("실제 권한 승인은 macOS가 관리합니다. 설정 목록에 ScreenTap이 없으면 + 버튼으로 앱을 추가해 주세요.", "macOS manages the approval. If ScreenTap is missing from the list, add the app using the + button."))
+        let intro = NSTextField(wrappingLabelWithString: L.text("허용을 누르면 macOS에 권한을 요청합니다. 시스템 승인창에서 계속 진행해 주세요.", "Allow sends a permission request to macOS. Continue in the system approval dialog."))
         intro.textColor = .secondaryLabelColor
         intro.frame = NSRect(x: 28, y: 320, width: 565, height: 40); root.addSubview(intro)
         addRow(root, title: L.text("접근성", "Accessibility"), detail: L.text("⌥Tab 단축키와 개별 창 전환", "⌥Tab shortcut and individual window switching"),
@@ -89,6 +99,8 @@ final class PermissionsController: NSWindowController, NSWindowDelegate {
         message.font = .systemFont(ofSize: 11); message.textColor = .secondaryLabelColor
         message.frame = NSRect(x: 28, y: 75, width: 565, height: 56); root.addSubview(message)
         configure(closeButton, title: L.text("나중에", "Not now"), action: #selector(closeSetup), rect: NSRect(x: 28, y: 24, width: 100, height: 32), root: root)
+        let location = NSButton()
+        configure(location, title: L.text("앱 위치 보기", "Show app in Finder"), action: #selector(showAppLocation), rect: NSRect(x: 142, y: 24, width: 168, height: 32), root: root)
         let refresh = NSButton()
         configure(refresh, title: L.text("다시 확인", "Check again"), action: #selector(checkAgain), rect: NSRect(x: 328, y: 24, width: 118, height: 32), root: root)
         configure(restartButton, title: L.text("앱 재시작", "Restart app"), action: #selector(restartApp), rect: NSRect(x: 456, y: 24, width: 135, height: 32), root: root)
@@ -110,27 +122,60 @@ final class PermissionsController: NSWindowController, NSWindowDelegate {
     @objc private func checkAgain() { refresh() }
     @objc private func closeSetup() { close() }
     @objc private func restartApp() { restart?() }
+    @objc private func showAppLocation() { NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL]) }
 
     private func request(_ kind: PermissionKind) {
         guard !presentingConsent, let window, let status = readStatus?() else { return }
         guard kind == .accessibility ? !status.accessibility : !status.screenRecording else { refresh(); return }
+        if requests.hasRequested(kind) {
+            requests.respond(to: kind, allowed: true); return
+        }
         presentingConsent = true
         let name = kind == .accessibility ? L.text("접근성", "Accessibility") : L.text("화면 기록", "Screen Recording")
         let alert = NSAlert()
         alert.messageText = L.text("\(name)을 허용할까요?", "Allow \(name)?")
-        alert.informativeText = L.text("허용을 누르면 해당 macOS 설정 화면을 엽니다. 설정 목록에서 ScreenTap을 직접 켜 주세요. 목록에 없으면 + 버튼으로 앱을 추가하세요. 거부를 누르면 설정을 열지 않습니다.", "Allow opens the relevant macOS settings page. Turn on ScreenTap in that list, or add it using + if missing. Deny leaves System Settings closed.")
+        alert.informativeText = L.text("허용을 누르면 macOS에 실제 권한 요청을 보냅니다. 시스템 승인창에서 허용하거나 설정 열기를 선택해 주세요. 거부를 누르면 요청하지 않습니다.", "Allow sends a real permission request to macOS. Approve it or choose Open Settings in the system dialog. Deny sends no request.")
         let allow = alert.addButton(withTitle: L.text("허용", "Allow"))
         allow.keyEquivalent = "\r"; allow.bezelColor = .systemBlue
         alert.addButton(withTitle: L.text("거부", "Deny")).keyEquivalent = "\u{1b}"
         alert.beginSheetModal(for: window) { [weak self] response in
             guard let self else { return }
             self.presentingConsent = false
-            guard response == .alertFirstButtonReturn else { self.refresh(); return }
-            let pane = kind == .accessibility ? "Privacy_Accessibility" : "Privacy_ScreenCapture"
-            // One route only: no AX prompt or CGRequest call followed by a second open.
-            if !NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)")!) {
-                self.message.stringValue = L.text("설정 화면을 열지 못했습니다. 시스템 설정의 개인정보 보호 및 보안에서 허용해 주세요.", "Could not open settings. Allow ScreenTap in System Settings → Privacy & Security.")
+            self.requests.respond(to: kind, allowed: response == .alertFirstButtonReturn)
+            self.refresh(force: true)
+        }
+    }
+
+    private func requestSystemPermission(_ kind: PermissionKind) {
+        switch kind {
+        case .accessibility:
+            let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+            _ = AXIsProcessTrustedWithOptions(options)
+        case .screenRecording:
+            // Use the capture API's authorization path, even when preflight is false.
+            // Only enumerate metadata; no screenshot, audio, or stream is captured here.
+            screenRequestOutcome = "pending SCShareableContent authorization"
+            SCShareableContent.getExcludingDesktopWindows(true, onScreenWindowsOnly: true) { [weak self] content, error in
+                let outcome: String
+                if let error = error as NSError? { outcome = "\(error.domain) (\(error.code)): \(error.localizedDescription)" }
+                else { outcome = content == nil ? "no content and no OS error" : "shareable-content enumeration succeeded" }
+                DispatchQueue.main.async {
+                    guard let self else { return }
+                    self.screenRequestOutcome = outcome
+                    self.refresh(force: true)
+                    if self.readStatus?().screenRecording != true {
+                        self.message.stringValue = L.text("macOS에 화면 기록 권한을 요청했습니다. ‘설정 열기’에서 ScreenTap을 켜 주세요. 이미 켰다면 ‘앱 재시작’을 선택하세요.", "Screen Recording permission was requested from macOS. Enable ScreenTap with Open Settings. If already enabled, choose Restart app.")
+                    }
+                }
             }
+        }
+    }
+
+    private func openSystemSettings(_ kind: PermissionKind) {
+        let pane = kind == .accessibility ? "Privacy_Accessibility" : "Privacy_ScreenCapture"
+        // Settings opens only on a separate, explicit follow-up click.
+        if !NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)")!) {
+            message.stringValue = L.text("설정 화면을 열지 못했습니다. 시스템 설정의 개인정보 보호 및 보안에서 허용해 주세요.", "Could not open settings. Allow ScreenTap in System Settings → Privacy & Security.")
         }
     }
 }

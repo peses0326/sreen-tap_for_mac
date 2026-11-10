@@ -168,6 +168,43 @@ final class BrandingTests {
     }
 }
 
+final class PermissionRequestTests {
+    func testDenyThenAllowRegistersWithSystemWithoutOpeningSettings() {
+        var native: [PermissionKind] = [], settings: [PermissionKind] = []
+        let requests = PermissionRequests(requestSystem: { native.append($0) }, openSettings: { settings.append($0) })
+        requests.respond(to: .screenRecording, allowed: false)
+        checkTrue(native.isEmpty); checkTrue(settings.isEmpty)
+        checkFalse(requests.hasRequested(.screenRecording))
+        requests.respond(to: .screenRecording, allowed: true)
+        checkEqual(native, [.screenRecording]); checkTrue(settings.isEmpty)
+        checkTrue(requests.hasRequested(.screenRecording))
+    }
+    func testSettingsIsOnlyASeparateExplicitFollowup() {
+        var native: [PermissionKind] = [], settings: [PermissionKind] = []
+        let requests = PermissionRequests(requestSystem: { native.append($0) }, openSettings: { settings.append($0) })
+        requests.respond(to: .screenRecording, allowed: true)
+        checkEqual(native.count, 1); checkTrue(settings.isEmpty)
+        requests.respond(to: .screenRecording, allowed: true)
+        checkEqual(native.count, 1); checkEqual(settings, [.screenRecording])
+    }
+    func testPermissionsRegisterIndependently() {
+        var native: [PermissionKind] = [], settings: [PermissionKind] = []
+        let requests = PermissionRequests(requestSystem: { native.append($0) }, openSettings: { settings.append($0) })
+        requests.respond(to: .accessibility, allowed: true)
+        checkFalse(requests.hasRequested(.screenRecording))
+        requests.respond(to: .screenRecording, allowed: true)
+        checkEqual(native, [.accessibility, .screenRecording]); checkTrue(settings.isEmpty)
+    }
+    func testRepeatedClicksDoNotRepeatNativeRequests() {
+        var native = 0, settings = 0
+        let requests = PermissionRequests(requestSystem: { _ in native += 1 }, openSettings: { _ in settings += 1 })
+        requests.respond(to: .screenRecording, allowed: true)
+        for _ in 0..<10 { requests.respond(to: .screenRecording, allowed: true) }
+        requests.respond(to: .screenRecording, allowed: false)
+        checkEqual(native, 1); checkEqual(settings, 10)
+    }
+}
+
 // Standalone checks run with Command Line Tools; XCTest requires a full Xcode install.
 var failures = 0
 func checkTrue(_ condition: Bool, file: StaticString = #filePath, line: UInt = #line) {
@@ -182,8 +219,12 @@ func checkNotNil<T>(_ a: T?, file: StaticString = #filePath, line: UInt = #line)
 
 @main enum CoreChecks {
     static func main() {
-        let order = WindowOrderTests(), memory = MemoryBudgetTests(), capture = CaptureGateTests(), preview = PreviewRegressionTests(), branding = BrandingTests()
+        let order = WindowOrderTests(), memory = MemoryBudgetTests(), capture = CaptureGateTests(), preview = PreviewRegressionTests(), branding = BrandingTests(), permission = PermissionRequestTests()
         let tests: [(String, () -> Void)] = [
+            ("permission consent dispatches native request; deny does nothing", permission.testDenyThenAllowRegistersWithSystemWithoutOpeningSettings),
+            ("settings opens only on explicit follow-up", permission.testSettingsIsOnlyASeparateExplicitFollowup),
+            ("accessibility and recording register independently", permission.testPermissionsRegisterIndependently),
+            ("repeated clicks do not duplicate native permission requests", permission.testRepeatedClicksDoNotRepeatNativeRequests),
             ("production renderer displays captured thumbnail pixels", branding.testProductionRendererDrawsThumbnailContent),
             ("macOS decodes application icon", branding.testMacOSRecognizesAppIcon),
             ("oversized screenshot produces visible bounded pixels", preview.testOversizedCaptureIsDownsampledInsteadOfDiscarded),

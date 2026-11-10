@@ -314,7 +314,7 @@ final class AppController: NSObject, NSApplicationDelegate {
 
     private func memoryReport() -> String {
         let footprint = MemoryDiagnostics.footprint()
-        return "ScreenTap \(appVersion)\nmacOS: \(ProcessInfo.processInfo.operatingSystemVersionString)\nPhysical footprint: \(footprint)\nThumbnail bytes: \(thumbnails.cache.bytes) / \(thumbnails.cache.limit)\nThumbnail count: \(thumbnails.cache.count)\nVisible windows: \(records.count)\nAccessibility: \(AXIsProcessTrusted())\nScreen recording: \(CGPreflightScreenCaptureAccess())\nSwitcher open: \(visible)\n\(thumbnails.diagnosticReport)"
+        return "ScreenTap \(appVersion)\nmacOS: \(ProcessInfo.processInfo.operatingSystemVersionString)\nPhysical footprint: \(footprint)\nThumbnail bytes: \(thumbnails.cache.bytes) / \(thumbnails.cache.limit)\nThumbnail count: \(thumbnails.cache.count)\nVisible windows: \(records.count)\nAccessibility: \(AXIsProcessTrusted())\nScreen recording: \(CGPreflightScreenCaptureAccess())\nSwitcher open: \(visible)\nRunning app: \(Bundle.main.bundlePath)\n\(permissions?.diagnosticReport ?? "Permission setup not opened\n")\(thumbnails.diagnosticReport)"
     }
     @objc private func copyDiagnostics() {
         NSPasteboard.general.clearContents()
