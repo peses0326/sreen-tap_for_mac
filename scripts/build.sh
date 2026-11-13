@@ -13,6 +13,6 @@ cp LICENSE NOTICE.md "$app_path/Contents/Resources/"
 cp Resources/Info.plist "$app_path/Contents/Info.plist"
 cp -R Resources/en.lproj Resources/ko.lproj "$app_path/Contents/Resources/"
 # Use SIGN_IDENTITY for a stable local signing certificate; default is ad-hoc personal use.
-codesign --force --sign "${SIGN_IDENTITY:--}" --identifier local.espark.LeanTab "$app_path"
+codesign --force --sign "${SIGN_IDENTITY:--}" --identifier local.espark.screentap "$app_path"
 codesign --verify --strict "$app_path"
 echo "$app_path"

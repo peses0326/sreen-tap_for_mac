@@ -4,8 +4,6 @@ ScreenTap's newly written source and original branding are made available by
 peses0326 under the MIT License. See LICENSE. Publishing under MIT grants
 permissions to recipients; it does not assign the author's copyright to them.
 
-ScreenTap was initially developed as LeanTab and renamed in version 0.2.0.
-
 ## Inspiration
 
 [AltTab](https://github.com/lwouis/alt-tab-macos), by lwouis and its contributors,
