@@ -64,6 +64,12 @@ public final class ByteCache<Key: Hashable, Value> {
         clock += 1; items[key] = (value, cost, clock); bytes += cost
         return true
     }
+    /// Membership check that does not refresh LRU recency.
+    public func contains(_ key: Key) -> Bool { items[key] != nil }
+    /// Drop entries whose keys are no longer alive (e.g. closed windows).
+    public func retain(only keys: Set<Key>) {
+        for (key, item) in items where !keys.contains(key) { items.removeValue(forKey: key); bytes -= item.cost }
+    }
     public func removeAll() { items.removeAll(keepingCapacity: false); bytes = 0 }
 }
 

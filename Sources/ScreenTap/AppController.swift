@@ -241,7 +241,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         if page != nextPage {
             page = nextPage
             view.reset(records: visibleRecords, selected: selection.index, offset: offset, total: records.count, columns: columns)
-            thumbnails.load(visibleRecords, onImage: { [weak self] in self?.view?.needsDisplay = true }, onStatus: { [weak self] status in
+            thumbnails.load(visibleRecords, alive: Set(records.map(\.key)), onImage: { [weak self] in self?.view?.needsDisplay = true }, onStatus: { [weak self] status in
                 self?.view?.status = status; self?.view?.needsDisplay = true
             })
         } else { view.selected = selection.index; view.needsDisplay = true }
@@ -264,7 +264,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         panel?.orderOut(nil)
         view?.clear(); panel?.contentView = nil
         panel = nil; view = nil; records.removeAll()
-        thumbnails.clear()
+        thumbnails.cancel()
     }
 
     private func refreshPermissions() -> PermissionStatus {
