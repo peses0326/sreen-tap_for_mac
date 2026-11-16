@@ -1,6 +1,6 @@
 # ScreenTap 0.2.0
 
-LeanTab is now ScreenTap: a native macOS window switcher with a new window-and-arrow icon.
+ScreenTap 0.2.0: a native macOS window switcher with a new window-and-arrow icon.
 
 - Recognize individual windows with thumbnail previews and recently used ordering.
 - Hold Option and press Tab to choose a window; release Option to switch.
@@ -9,8 +9,7 @@ LeanTab is now ScreenTap: a native macOS window switcher with a new window-and-a
 - Korean and English interface.
 - Open-source MIT License, copyright © 2026 peses0326.
 
-The app identity is retained from LeanTab for continuity. Rebuilds and installation
-path changes may still require reauthorizing Accessibility and Screen Recording.
+Rebuilds and installation path changes may require reauthorizing Accessibility and Screen Recording.
 
 ## Install
 

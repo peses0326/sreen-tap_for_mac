@@ -69,6 +69,17 @@ final class MemoryBudgetTests {
         let (badW, badH) = ThumbnailSize.fit(width: .infinity, height: 0)
         checkEqual(badW, 1); checkEqual(badH, 1)
     }
+    func testRetainDropsClosedWindowsWithoutTouchingRecency() {
+        let cache = ByteCache<Int, Int>(limit: 10)
+        cache.insert(1, for: 1, cost: 3); cache.insert(2, for: 2, cost: 3); cache.insert(3, for: 3, cost: 3)
+        checkTrue(cache.contains(1)); checkFalse(cache.contains(9))
+        cache.retain(only: [1, 3])
+        checkFalse(cache.contains(2)); checkEqual(cache.count, 2); checkEqual(cache.bytes, 6)
+        // contains() must not refresh recency: key 1 is still the oldest and is evicted first.
+        cache.insert(4, for: 4, cost: 4); cache.insert(5, for: 5, cost: 3)
+        checkFalse(cache.contains(1)); checkTrue(cache.contains(3))
+        checkLessOrEqual(cache.bytes, cache.limit)
+    }
     func testClearReleasesCachedReferences() {
         final class Image {}
         let cache = ByteCache<Int, Image>(limit: 100)
@@ -242,6 +253,7 @@ func checkNotNil<T>(_ a: T?, file: StaticString = #filePath, line: UInt = #line)
             ("replacement cost accounting", memory.testReplacementAndNegativeCostsCannotBreakAccounting),
             ("1000 4K window stress", memory.testMany4KWindowsNeverExceedBudget),
             ("portrait and invalid size", memory.testPortraitTinyAndInvalidSizes),
+            ("cache survives reopen; closed windows pruned", memory.testRetainDropsClosedWindowsWithoutTouchingRecency),
             ("clear releases image references", memory.testClearReleasesCachedReferences)
         ]
         for (name, test) in tests {

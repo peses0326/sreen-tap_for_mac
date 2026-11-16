@@ -36,7 +36,7 @@ private func attribute(_ element: AXUIElement, _ key: String) -> CFTypeRef? {
 }
 
 final class WindowService {
-    private let queue = DispatchQueue(label: "local.leantab.accessibility", qos: .userInitiated)
+    private let queue = DispatchQueue(label: "local.screentap.accessibility", qos: .userInitiated)
     private var observers: [pid_t: AXObserver] = [:]
     private var order = WindowOrder()
     private var tokens: [NSObjectProtocol] = []

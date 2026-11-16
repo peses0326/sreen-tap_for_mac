@@ -29,7 +29,11 @@ final class ThumbnailService {
         pressure?.resume()
     }
 
-    func clear() { gate.invalidate(); cache.removeAll(); pending = nil; phase = "idle" }
+    /// Stop the current capture sequence but keep cached thumbnails so the next
+    /// open can draw them immediately.
+    func cancel() { gate.invalidate(); pending = nil; phase = "idle" }
+    /// Drop every cached thumbnail (memory pressure, permission revoked).
+    func clear() { cancel(); cache.removeAll() }
 
     private func completed(_ token: UInt64) -> Bool {
         if gate.complete(token) { return true }
@@ -39,15 +43,20 @@ final class ThumbnailService {
 
     // Invalidated OS requests keep their slot until the callback returns. Only the
     // latest page is queued, so fast paging or reopening cannot accumulate captures.
-    func load(_ records: [WindowRecord], onImage: @escaping () -> Void, onStatus: @escaping (String) -> Void) {
-        clear()
-        guard !records.isEmpty else { return }
+    // Cached thumbnails are shown right away; this refreshes them in the background,
+    // capturing windows without a cached image first.
+    func load(_ pageRecords: [WindowRecord], alive: Set<WindowKey>, onImage: @escaping () -> Void, onStatus: @escaping (String) -> Void) {
+        cancel()
+        cache.retain(only: alive)
+        guard !pageRecords.isEmpty else { return }
+        let records = pageRecords.filter { !cache.contains($0.key) } + pageRecords.filter { cache.contains($0.key) }
         guard CGPreflightScreenCaptureAccess() else {
+            cache.removeAll()
             lastError = "Screen Recording permission unavailable"
             onStatus(L.text("미리보기에는 화면 기록 권한이 필요합니다", "Screen Recording permission is needed for thumbnails")); return
         }
         guard !gate.inFlight else {
-            pending = { [weak self] in self?.load(records, onImage: onImage, onStatus: onStatus) }
+            pending = { [weak self] in self?.load(pageRecords, alive: alive, onImage: onImage, onStatus: onStatus) }
             phase = "waiting for previous capture"
             onStatus(L.text("미리보기를 준비하는 중…", "Preparing previews…")); return
         }

@@ -59,7 +59,7 @@
 
 ## 0.2.0 배포 준비
 
-- 앱 이름: ScreenTap. 이전 LeanTab의 번들 식별자는 연속성을 위해 유지.
+- 앱 이름: ScreenTap. 번들 식별자: `local.espark.screentap`.
 - 새 앱 아이콘: 자체 제작한 겹친 창 + 전환 화살표. PNG 표현을 포함한 ICNS를 macOS ImageIO에서 디코딩 검증.
 - MIT License, 저작권 표기 peses0326, 원본 프로젝트 참고 출처 NOTICE 포함.
 - 랜딩페이지: 한국어/영어, 다운로드 링크, 사용법, 메모리 설계, 설치 FAQ.
