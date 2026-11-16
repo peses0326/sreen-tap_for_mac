@@ -2,14 +2,9 @@
 
 ## 근거
 
-- [AltTab 저장소](https://github.com/lwouis/alt-tab-macos): 기능과 프로젝트 개요. 공개 Swift 프로젝트라는 점에서 언어 교체만으로 메모리 문제를 해결할 수 있다고 가정하지 않았다.
-- [원본 메모리 이슈 #5539](https://github.com/lwouis/alt-tab-macos/issues/5539): 개발자가 전체 크기 HiDPI 미리보기 보관 비용을 설명한다. 이 설명은 원본 설계의 비용에 관한 근거이며, 사용자의 700MB 전체를 이 요인 하나로 진단한 것은 아니다.
-- [원본 WindowServer 이슈 #4255](https://github.com/lwouis/alt-tab-macos/issues/4255): 원본 프로세스 외 WindowServer 비용도 관찰해야 한다는 근거.
 - [Apple SCScreenshotManager](https://developer.apple.com/documentation/screencapturekit/scscreenshotmanager): 일회성 창 이미지 요청.
 - [Apple AXUIElement](https://developer.apple.com/documentation/applicationservices/axuielement): 창 열거와 접근성 동작.
 - 설치된 macOS SDK의 ScreenCaptureKit 헤더에서 출력 픽셀 크기, 독립 창 필터, 그림자 제외 설정을 확인했다.
-
-터미널의 GitHub 접근이 DNS 제한으로 실패하여 원본 전체 저장소를 내려받지 못했다. 웹에서 확인한 개요·공개 이슈를 근거로 구현했으며, 원본 전체 소스의 정적 분석이나 원본 메모리 프로파일링은 완료하지 않았다. 원본 Swift 코드를 복사하지 않았다.
 
 ## 책임 분리
 
@@ -41,7 +36,7 @@ AX 호출은 다른 프로세스가 응답해야 하므로 직렬 백그라운�
 
 ## 주요 차이
 
-원본의 전체 크기 선택 창 미리보기를 구현하지 않고 작은 격자 미리보기만 제공한다. 검색·다국어 리소스 축소보다 이미지 해상도·개수·수명과 캡처 동시성에 우선순위를 두었다. 앱 전체 메모리 목표는 실사용 측정으로 정해야 하며 0.1.1의 종료 후 43.1MiB, 마지막 캡처 시점 134.8MiB는 초기 참고 측정이며 0.2.0의 성능 보증으로 사용하지 않는다.
+전체 크기 선택 창 미리보기를 구현하지 않고 작은 격자 미리보기만 제공한다. 검색·다국어 리소스 축소보다 이미지 해상도·개수·수명과 캡처 동시성에 우선순위를 두었다. 앱 전체 메모리 목표는 실사용 측정으로 정해야 하며 0.1.1의 종료 후 43.1MiB, 마지막 캡처 시점 134.8MiB는 초기 참고 측정이며 0.2.0의 성능 보증으로 사용하지 않는다.
 
 ## 0.2.0 브랜드와 공개용 렌더링
 

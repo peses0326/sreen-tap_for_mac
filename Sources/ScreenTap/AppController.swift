@@ -116,7 +116,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
         NSApp.orderFrontStandardAboutPanel(options: [
             .applicationName: "ScreenTap", .applicationVersion: appVersion,
-            .credits: NSAttributedString(string: L.text("창을 보고, 선택하고, 하던 일을 이어가세요.\nAltTab에서 영감을 받아 별도로 작성했습니다.", "See your windows. Keep your flow.\nInspired by AltTab; independently written."))])
+            .credits: NSAttributedString(string: L.text("창을 보고, 선택하고, 하던 일을 이어가세요.", "See your windows. Keep your flow."))])
     }
     @objc private func quit() { NSApp.terminate(nil) }
     @objc private func reconnect() {
